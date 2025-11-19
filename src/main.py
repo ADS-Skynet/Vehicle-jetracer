@@ -18,14 +18,18 @@ def load_config(config_path: Path | str | None = None) -> dict:
         'device': '/dev/video4',
         'broker_status': 'tcp://localhost:5562',
         'publish_state_hz': 10,
-        'throttle': -0.15,
+        'throttle': -0.25,
     }
     try:
         if config_path is None:
-            config_path = Path(__file__).resolve().parent / "config.yaml"
+            # config_path = Path(__file__).resolve().parent / "config.yaml"
+            config_path = "../config.yaml"
+        print(f"Loading vehicle config from: {config_path}")
+
         config_path = Path(config_path)
         if not config_path.exists():
             return defaults
+
         with open(config_path, 'r') as f:
             data = yaml.safe_load(f) or {}
         for k, v in defaults.items():

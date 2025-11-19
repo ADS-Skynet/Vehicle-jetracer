@@ -16,22 +16,22 @@ dependencies = [
   "pyyaml>=6.0,<7.0",
   "pyzmq>=25.0,<28.0",
   "numpy>=1.24,<3.0",
-#   "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
+  "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
   "skynet-common @ git+https://github.com/ADS-Skynet/Common.git",
 ]
 
-# Optional dependency groups
-[project.optional-dependencies]
-# Official Jetracer from GitHub (default)
-prod = [
-  "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
-]
+# # Optional dependency groups
+# [project.optional-dependencies]
+# # Official Jetracer from GitHub (default)
+# prod = [
+#   "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
+# ]
 
-# Local Jetracer module for development/testing
-# Update the path below to point to your local Jetracer directory
-local = [
-  "jetracer @ file:///home/siwoo/ADS-Skynet/Jetracer",
-]
+# # Local Jetracer module for development/testing
+# # Update the path below to point to your local Jetracer directory
+# local = [
+#   "jetracer @ file:///home/siwoo/ADS-Skynet/Jetracer",
+# ]
 
 [tool.setuptools]
 package-dir = {"vehicle" = "src"}

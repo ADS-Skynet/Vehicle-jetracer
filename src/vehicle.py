@@ -34,7 +34,7 @@ class Vehicle:
         action_url: str = 'tcp://localhost:5561',
         jpeg_quality: int = 80,
         publish_state_hz: int = 10,
-        throttle: float = 0.15,
+        throttle: float = 0.25,
         image_shm_name: str = "camera_feed",
         detection_shm_name: str = "detection_results",
         control_shm_name: str = "control_commands",
@@ -47,6 +47,7 @@ class Vehicle:
         self.brake = 0.0
         self.image_width = image_width
         self.image_height = image_height
+        self.status = "READY"
 
         # Initialize NvidiaRacecar for real hardware actuation
         print("Initializing NvidiaRacecar for real actuation...")
@@ -103,18 +104,20 @@ class Vehicle:
     def _on_stop(self):
         if not self.paused:
             self.paused = True
-            self.steering = 0.0
-            self.throttle = 0.0
-            self.car.steering = 0.0
             self.car.throttle = 0.0
+            self.status = "PAUSED"
+
             print("\n[vehicle] STOPPED - Control disabled")
 
     def _on_resume(self):
         if self.paused:
             self.paused = False
+            self.car.throttle = self.throttle
+
             print("\n[vehicle] RESUMED - Control enabled")
 
     def _send_state(self, frame_id: int):
+        print("[vehicle] Sending state...", self.steering, self.throttle, self.paused)
         state = {
             'steering': float(self.steering),
             'throttle': float(self.throttle),
@@ -140,9 +143,6 @@ class Vehicle:
             pass
 
     def _apply_control_from_lkas(self):
-        if self.paused:
-            return
-
         control = self.lkas.get_control(timeout=0.1)
         if control is not None:
             self.steering = max(-1.0, min(1.0, control.steering))
@@ -150,36 +150,29 @@ class Vehicle:
 
             # Apply to real hardware
             self.car.steering = -self.steering * 10
+
             if self.brake > 0.5:
                 self.car.throttle = 0.0
             else:
-                self.car.throttle = -self.throttle
+                self.car.throttle = self.throttle
+
 
     def run(self):
         self.running = True
+
         frame_id = 0
         last_state_ts = 0.0
         last_fps_ts = time.time()
         fps_frame_count = 0
         current_fps = 0.0
+
         print("\n[vehicle] Starting main loop...")
         print("[vehicle] Sending frames to LKAS via shared memory...")
         print("[vehicle] LKAS broker handles broadcasting to viewers")
+
         try:
             while self.running:
-                frame = self.camera.read_image()
-                if frame is None:
-                    print("[vehicle] Warning: Failed to read frame from camera")
-                    continue
-
-                if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
-                    frame = cv2.resize(frame, (self.image_width, self.image_height))
-
-                timestamp = time.time()
-                self.lkas.send_image(frame, timestamp, frame_id)
-
-                self._apply_control_from_lkas()
-
+                # Publish & Subscribe ZMQ messages
                 if self.action_sub:
                     self.action_sub.poll()
 
@@ -188,16 +181,42 @@ class Vehicle:
                     self._send_state(frame_id)
                     last_state_ts = now
 
+                # If paused, skip reading/applying control
+                if self.paused:
+                    time.sleep(0.5)
+                    continue
+
+                # Read frame from camera
+                frame = self.camera.read_image()
+                if frame is None:
+                    print("[vehicle] Warning: Failed to read frame from camera")
+                    continue
+
+                # Resize frame if needed
+                if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
+                    frame = cv2.resize(frame, (self.image_width, self.image_height))
+
+                # Send frame to LKAS via shared memory
+                timestamp = time.time()
+                self.lkas.send_image(frame, timestamp, frame_id)
+
+                # Apply control commands from LKAS
+                self._apply_control_from_lkas()
+
+                # FPS calculation and status update
                 fps_frame_count += 1
                 if now - last_fps_ts >= 1.0:
                     current_fps = fps_frame_count / (now - last_fps_ts)
-                    status = "PAUSED" if self.paused else f"{current_fps:.1f} FPS"
-                    print(f"\r[vehicle] {status} | Frame {frame_id}", end="", flush=True)
+                    self.status = f"{current_fps:.1f} FPS"
+                    print(f"\r[vehicle] {self.status} | Frame {frame_id}", end="", flush=True)
                     fps_frame_count = 0
                     last_fps_ts = now
 
+                # Increment frame ID
                 frame_id += 1
+
                 time.sleep(0.016)  # 60 FPS (was 0.015 = 66 FPS)
+
         except KeyboardInterrupt:
             print("[vehicle] Interrupted by user")
         finally:
