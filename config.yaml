@@ -1,9 +1,0 @@
-# Vehicle-jetracer configuration
-device: /dev/video4
-broker_status: tcp://localhost:5562
-publish_state_hz: 10
-throttle: -0.25
-
-# Note: All ZMQ port management is handled by LKAS broker.
-# Vehicle only connects to broker for state publishing, never binds any ports.
-# Frame/detection broadcasting to viewers is done by LKAS broker via shared memory.

@@ -3,40 +3,10 @@ import time
 import json
 import cv2
 import argparse
-import yaml
-from pathlib import Path
 from skynet_common.config import ConfigManager
 from .vehicle import Vehicle
+from .constants import Hardware, Communication, Control
 
-
-def load_config(config_path: Path | str | None = None) -> dict:
-    """
-    Load YAML config from Jetracer root config.yaml.
-    Returns defaults when file is missing or invalid.
-    """
-    defaults = {
-        'device': '/dev/video4',
-        'broker_status': 'tcp://localhost:5562',
-        'publish_state_hz': 10,
-        'throttle': -0.25,
-    }
-    try:
-        if config_path is None:
-            # config_path = Path(__file__).resolve().parent / "config.yaml"
-            config_path = "../config.yaml"
-        print(f"Loading vehicle config from: {config_path}")
-
-        config_path = Path(config_path)
-        if not config_path.exists():
-            return defaults
-
-        with open(config_path, 'r') as f:
-            data = yaml.safe_load(f) or {}
-        for k, v in defaults.items():
-            data.setdefault(k, v)
-        return data
-    except Exception:
-        return defaults
 
 def main():
     # Load skynet-common config for LKAS settings
@@ -44,20 +14,17 @@ def main():
     comm = skynet_config.communication
     camera_cfg = skynet_config.camera
 
-    # Load vehicle-specific config
-    cfg = load_config()
-
     parser = argparse.ArgumentParser(description="Vehicle-jetracer main loop with LKAS")
-    parser.add_argument('--device', default=cfg.get('device'),
-                       help=f"Camera device path (default: {cfg.get('device')})")
-    parser.add_argument('--broker-status', default=cfg.get('broker_status'),
-                       help=f"ZMQ URL for LKAS broker status (default: {cfg.get('broker_status')})")
+    parser.add_argument('--device', default=Hardware.CAMERA_DEVICE,
+                       help=f"Camera device path (default: {Hardware.CAMERA_DEVICE})")
+    parser.add_argument('--broker-status', default=Communication.BROKER_STATUS_URL,
+                       help=f"ZMQ URL for LKAS broker status (default: {Communication.BROKER_STATUS_URL})")
     parser.add_argument('--action-url', default=f"tcp://localhost:{comm.zmq_action_port + 3}",
                        help=f"ZMQ URL for action commands (default: tcp://localhost:{comm.zmq_action_port + 3})")
-    parser.add_argument('--publish-state-hz', type=float, default=cfg.get('publish_state_hz'),
-                       help=f"Vehicle state publish rate (default: {cfg.get('publish_state_hz')} Hz)")
-    parser.add_argument('--throttle', type=float, default=cfg.get('throttle'),
-                       help=f"Fixed throttle value (default: {cfg.get('throttle')})")
+    parser.add_argument('--publish-state-hz', type=float, default=Communication.PUBLISH_STATE_HZ,
+                       help=f"Vehicle state publish rate (default: {Communication.PUBLISH_STATE_HZ} Hz)")
+    parser.add_argument('--throttle', type=float, default=Control.DEFAULT_THROTTLE,
+                       help=f"Fixed throttle value (default: {Control.DEFAULT_THROTTLE})")
     args = parser.parse_args()
 
     print("=" * 60)

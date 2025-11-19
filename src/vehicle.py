@@ -117,7 +117,6 @@ class Vehicle:
             print("\n[vehicle] RESUMED - Control enabled")
 
     def _send_state(self, frame_id: int):
-        print("[vehicle] Sending state...", self.steering, self.throttle, self.paused)
         state = {
             'steering': float(self.steering),
             'throttle': float(self.throttle),
@@ -193,12 +192,14 @@ class Vehicle:
                     continue
 
                 # Resize frame if needed
-                if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
-                    frame = cv2.resize(frame, (self.image_width, self.image_height))
+                # if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
+                #     print("[vehicle] Resizing frame to match LKAS expected size")
+                #     frame = cv2.resize(frame, (self.image_width, self.image_height))
 
                 # Send frame to LKAS via shared memory
                 timestamp = time.time()
                 self.lkas.send_image(frame, timestamp, frame_id)
+                print(f"[vehicle] Sent frame {frame_id} to LKAS")
 
                 # Apply control commands from LKAS
                 self._apply_control_from_lkas()
