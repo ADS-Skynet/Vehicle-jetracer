@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skynet-vehicle"
+version = "0.1.0"
+description = "Vehicle loop for jetracer with LKAS integration"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Siwoo248", email = "siwoo0408@kookmin.ac.kr" }
+]
+dependencies = [
+  "opencv-python>=4.8,<5.0",
+  "pyyaml>=6.0,<7.0",
+  "pyzmq>=25.0,<28.0",
+  "numpy>=1.24,<3.0",
+#   "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
+  "skynet-common @ git+https://github.com/ADS-Skynet/Common.git",
+]
+
+# Optional dependency groups
+[project.optional-dependencies]
+# Official Jetracer from GitHub (default)
+prod = [
+  "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
+]
+
+# Local Jetracer module for development/testing
+# Update the path below to point to your local Jetracer directory
+local = [
+  "jetracer @ file:///home/siwoo/ADS-Skynet/Jetracer",
+]
+
+[tool.setuptools]
+package-dir = {"vehicle" = "src"}
+packages = ["vehicle"]
+
+
+[project.scripts]
+vehicle = "vehicle.main:main"
