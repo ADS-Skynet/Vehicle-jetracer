@@ -35,6 +35,7 @@ class Vehicle:
         jpeg_quality: int = 80,
         publish_state_hz: int = 10,
         throttle: float = 0.25,
+        throttle_prev: float = 0.0,
         image_shm_name: str = "camera_feed",
         detection_shm_name: str = "detection_results",
         control_shm_name: str = "control_commands",
@@ -104,6 +105,8 @@ class Vehicle:
     def _on_stop(self):
         if not self.paused:
             self.paused = True
+            self.throttle_prev = self.throttle
+            self.throttle = 0.0
             self.car.throttle = 0.0
             self.status = "PAUSED"
 
@@ -112,6 +115,7 @@ class Vehicle:
     def _on_resume(self):
         if self.paused:
             self.paused = False
+            self.throttle = self.throttle_prev
             self.car.throttle = self.throttle
 
             print("\n[vehicle] RESUMED - Control enabled")
