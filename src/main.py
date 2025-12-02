@@ -36,6 +36,7 @@ def main():
     print(f"  Camera: {args.device}")
     print(f"  Status Pub Port: {cfg.communication.zmq_vehicle_status_port}")
     print(f"  Action Sub Port: {cfg.communication.zmq_action_forward_port}")
+    print(f"  Parameter Sub Port: {cfg.communication.zmq_param_servers_port}")
     print(f"  Image size: {cfg.camera.width}x{cfg.camera.height}")
     print(f"  Throttle Base: {cfg.throttle_policy.base}")
     print(f"  State publish rate: {args.publish_state_hz} Hz")
@@ -48,6 +49,7 @@ def main():
         device=args.device,
         status_pub_port=cfg.communication.zmq_vehicle_status_port,
         action_sub_port=cfg.communication.zmq_action_forward_port,
+        param_sub_port=cfg.communication.zmq_param_servers_port,
         publish_state_hz=args.publish_state_hz,
         throttle_base=cfg.throttle_policy.base,
         image_shm_name=cfg.communication.image_shm_name,

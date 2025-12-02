@@ -8,7 +8,11 @@ from jetracer.nvidia_racecar import NvidiaRacecar
 
 # Try to reuse common VehicleStatusPublisher if available
 try:
-    from skynet_common.communication.zmq_broadcast import VehicleStatusPublisher, ActionSubscriber
+    from skynet_common.communication.zmq_broadcast import (
+        VehicleStatusPublisher,
+        ActionSubscriber,
+        ParameterSubscriber
+    )
     _HAS_COMMON_PUB = True
 except Exception:
     _HAS_COMMON_PUB = False
@@ -30,8 +34,9 @@ class Vehicle:
     def __init__(
         self,
         device: str = '/dev/video4',
-        status_pub_port: str = 'tcp://localhost:5562',
-        action_sub_port: str = 'tcp://localhost:5561',
+        status_pub_port: int = 5562,
+        action_sub_port: int = 5561,
+        param_sub_port: int = 5560,
         jpeg_quality: int = 80,
         publish_state_hz: int = 10,
         throttle_base: float = 0.15,
@@ -44,6 +49,7 @@ class Vehicle:
         self.camera = Camera(device_path=device)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
         self.action_sub_url = f"tcp://localhost:{action_sub_port}"
+        self.param_sub_url = f"tcp://localhost:{param_sub_port}"
         self.steering = 0.0
         self.throttle = float(throttle_base)
         self.throttle_paused = float(throttle_base)
@@ -103,6 +109,14 @@ class Vehicle:
             self.action_sub = None
             print("⚠ ActionSubscriber not available, stop/resume disabled")
 
+        # Parameter subscriber (receive throttle updates from viewer via LKAS broker)
+        if _HAS_COMMON_PUB:
+            self.param_sub = ParameterSubscriber(category='vehicle', broker_url=self.param_sub_url)
+            self.param_sub.register_callback(self._on_parameter_update)
+        else:
+            self.param_sub = None
+            print("⚠ ParameterSubscriber not available, throttle updates disabled")
+
         # Give ZMQ time to establish connection (slow joiner problem)
         time.sleep(0.2)
 
@@ -134,6 +148,17 @@ class Vehicle:
             self.throttle_paused = self.throttle_base
 
         print("\n[vehicle] RESET - Steering set to 0, vehicle paused")
+
+    def _on_parameter_update(self, parameter: str, value: float):
+        """
+        Handle parameter updates from viewer (via LKAS broker).
+
+        Args:
+            parameter: Parameter name (e.g., 'throttle')
+            value: New parameter value
+        """
+        if parameter == 'throttle':
+            self._set_throttle(value)
 
     def _send_state(self, frame_id: int):
         state = {
@@ -172,9 +197,14 @@ class Vehicle:
         self.car.steering = -self.steering * 10  # Invert
 
     def _apply_control_from_lkas(self):
+        """
+        Apply control commands from LKAS (steering only).
+
+        LKAS handles lateral control (steering). Longitudinal control (throttle)
+        comes from user via parameter updates.
+        """
         control = self.lkas.get_control(timeout=0.1)
         if control is not None:
-            self._set_throttle(control.throttle)
             self._set_steering(control.steering)
 
     def run(self):
@@ -195,6 +225,10 @@ class Vehicle:
                 # Publish & Subscribe ZMQ messages
                 if self.action_sub:
                     self.action_sub.poll()
+
+                # Poll for parameter updates (throttle from viewer)
+                if self.param_sub:
+                    self.param_sub.poll()
 
                 now = time.time()
                 if now - last_state_ts >= 1.0 / self.publish_state_hz:
@@ -267,6 +301,13 @@ class Vehicle:
             if self.action_sub:
                 self.action_sub.close()
                 print("✓ Action subscriber closed")
+        except Exception:
+            pass
+
+        try:
+            if self.param_sub:
+                self.param_sub.close()
+                print("✓ Parameter subscriber closed")
         except Exception:
             pass
 
