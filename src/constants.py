@@ -22,7 +22,7 @@ class Communication:
 class Control:
     """Control configuration constants."""
 
-    DEFAULT_THROTTLE = -0.25  # Default throttle value (0 = stopped)
+    # DEFAULT_THROTTLE = -0.25  # Default throttle value (0 = stopped)
 
 
 # Export all constants
