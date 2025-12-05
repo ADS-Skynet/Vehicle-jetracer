@@ -9,26 +9,17 @@ from .constants import Hardware, Communication, Control
 
 
 def main():
-    # Load skynet-common config for LKAS settings
-    cfg = ConfigManager.load()
-    # cfg.communication = cfg.communication
-    # cfg_cam = cfg.camera
-    # cfg_thr = cfg.throttle_policy
-
     parser = argparse.ArgumentParser(description="Vehicle-jetracer main loop with LKAS")
     parser.add_argument('--device', default=Hardware.CAMERA_DEVICE,
                        help=f"Camera device path (default: {Hardware.CAMERA_DEVICE})")
-    # parser.add_argument('--broker-status', default=Communication.BROKER_STATUS_URL,
-    #                    help=f"ZMQ URL for LKAS broker status (default: {Communication.BROKER_STATUS_URL})")
-    # parser.add_argument('--action-url', default=f"tcp://localhost:{comm.zmq_action_port + 3}",
-    #                    help=f"ZMQ URL for action commands (default: tcp://localhost:{comm.zmq_action_port + 3})")
     parser.add_argument('--publish-state-hz', type=float, default=Communication.PUBLISH_STATE_HZ,
                        help=f"Vehicle state publish rate (default: {Communication.PUBLISH_STATE_HZ} Hz)")
-    # parser.add_argument('--throttle', type=float, default=Control.DEFAULT_THROTTLE,
-    #                    help=f"Fixed throttle value (default: {Control.DEFAULT_THROTTLE})")
-    # parser.add_argument('--throttle-base', type=float, default=throttle_cfg.base,
-    #                    help=f"Base throttle value for reset (default: {throttle_cfg.base})")
+    parser.add_argument('--keepalive', action='store_true', default=False,
+                       help="Enable camera be alive even with pausing as sending image to LKAS (default: False)")
     args = parser.parse_args()
+
+    # Load skynet-common config for LKAS settings
+    cfg = ConfigManager.load()
 
     print("=" * 60)
     print("Vehicle-Jetracer with LKAS")
@@ -57,6 +48,7 @@ def main():
         control_shm_name=cfg.communication.control_shm_name,
         image_width=cfg.camera.width,
         image_height=cfg.camera.height,
+        keepalive_camera=args.keepalive,
     )
     print(f"Starting vehicle loop. Throttle fixed = {v.throttle}")
     print("Press Ctrl+C to stop")

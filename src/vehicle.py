@@ -45,6 +45,7 @@ class Vehicle:
         control_shm_name: str = "control_commands",
         image_width: int = 640,
         image_height: int = 480,
+        keepalive_camera: bool = False,
     ):
         self.camera = Camera(device_path=device)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
@@ -57,6 +58,7 @@ class Vehicle:
         self.brake = 0.0
         self.image_width = image_width
         self.image_height = image_height
+        self.keepalive_camera = keepalive_camera
         self.status = "READY"
 
         # Initialize NvidiaRacecar for real hardware actuation
@@ -95,7 +97,7 @@ class Vehicle:
         self.jpeg_quality = int(jpeg_quality)
         self.running = False
         self.publish_state_hz = float(publish_state_hz)
-        self.paused = False  # Stop/resume state
+        self.paused = False if not self.keepalive_camera else True  # Stop/resume state
 
         # Action subscriber (receive commands from viewer via LKAS broker)
         if _HAS_COMMON_PUB:
@@ -142,10 +144,10 @@ class Vehicle:
         """Reset vehicle state: set steering to 0 and pause."""
         self._set_steering(0.0)
         if not self.paused:
-            self._set_throttle(self.throttle_base)
+            # self._set_throttle(self.throttle_base)
             self._on_pause()
-        else:
-            self.throttle_paused = self.throttle_base
+        # else:
+        #     self.throttle_paused = self.throttle_base
 
         print("\n[vehicle] RESET - Steering set to 0, vehicle paused")
 
@@ -236,7 +238,7 @@ class Vehicle:
                     last_state_ts = now
 
                 # If paused, skip reading/applying control
-                if self.paused:
+                if self.paused and not self.keepalive_camera:
                     time.sleep(0.5)
                     continue
 
@@ -255,11 +257,10 @@ class Vehicle:
                 timestamp = time.time()
                 self.lkas.send_image(frame, timestamp, frame_id)
 
-                # Apply control commands from LKAS
-                self._apply_control_from_lkas()
-
-                # Update vehicle actuation
-                self._update_vehicle_state()
+                # If keepalive is enabled, the loop may be fallout to here, so we should check pause state again at here
+                if not self.paused :
+                    self._apply_control_from_lkas()
+                    self._update_vehicle_state()
 
                 # FPS calculation and status update
                 fps_frame_count += 1
