@@ -3,7 +3,7 @@ import time
 import json
 import zmq
 import cv2
-from lkas import LKAS
+from lkas import LKASClient as LKAS
 from jetracer.nvidia_racecar import NvidiaRacecar
 
 # Try to reuse common VehicleStatusPublisher if available
