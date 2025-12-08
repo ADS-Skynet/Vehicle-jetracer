@@ -3,7 +3,7 @@ import time
 import json
 import cv2
 import argparse
-from skynet_common.config import ConfigManager
+from common.config import ConfigManager
 from .vehicle import Vehicle
 from .constants import Hardware, Communication, Control
 

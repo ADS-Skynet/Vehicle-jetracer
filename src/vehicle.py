@@ -8,7 +8,7 @@ from jetracer.nvidia_racecar import NvidiaRacecar
 
 # Try to reuse common VehicleStatusPublisher if available
 try:
-    from skynet_common.communication.zmq_broadcast import (
+    from common.communication.zmq_broadcast import (
         VehicleStatusPublisher,
         ActionSubscriber,
         ParameterSubscriber
