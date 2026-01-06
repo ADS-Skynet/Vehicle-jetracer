@@ -17,8 +17,9 @@ try:
 except Exception:
     _HAS_COMMON_PUB = False
 
-# Import camera from local module
+# Import camera and detector from local modules
 from .camera import Camera
+from .detector import YOLODetector
 
 
 class Vehicle:
@@ -46,6 +47,9 @@ class Vehicle:
         image_width: int = 640,
         image_height: int = 480,
         keepalive_camera: bool = False,
+        enable_yolo: bool = True,
+        yolo_model_path: str = None,
+        yolo_conf_threshold: float = 0.5,
     ):
         self.camera = Camera(device_path=device)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
@@ -82,6 +86,16 @@ class Vehicle:
             image_shape=(image_height, image_width, 3),
         )
         print("✓ LKAS initialized")
+
+        # Initialize YOLO detector
+        self.enable_yolo = enable_yolo
+        if self.enable_yolo:
+            print("Initializing YOLO object detector...")
+            self.yolo_detector = YOLODetector(yolo_model_path, yolo_conf_threshold)
+            print("✓ YOLO detector initialized")
+        else:
+            self.yolo_detector = None
+            print("YOLO detection disabled")
 
         self.context = zmq.Context()
 
@@ -257,6 +271,21 @@ class Vehicle:
                 timestamp = time.time()
                 self.lkas.send_image(frame, timestamp, frame_id)
 
+                # Run YOLO detection if enabled
+                if self.enable_yolo:
+                    detections = self.yolo_detector.detect(frame)
+                    if detections:
+                        print(f"[YOLO] Frame {frame_id}: {len(detections)} detections")
+                        for det in detections:
+                            print(f"  {det['class_name']}: {det['confidence']:.2f} at {det['bbox']}")
+                    
+                    # Always display frame with detections (if any)
+                    annotated_frame = self.yolo_detector.draw_detections(frame.copy(), detections)
+                    print(annotated_frame.shape, annotated_frame)
+                    # cv2.imshow("YOLO Real-Time Detections", annotated_frame)
+                    # cv2.waitKey(1)
+                    # Optional: send detections to shared memory or LKAS
+
                 # If keepalive is enabled, the loop may be fallout to here, so we should check pause state again at here
                 if not self.paused :
                     self._apply_control_from_lkas()
@@ -319,4 +348,11 @@ class Vehicle:
             print("✓ ZMQ state publisher closed")
         except Exception:
             pass
+
+        try:
+            cv2.destroyAllWindows()
+            print("✓ OpenCV windows closed")
+        except Exception:
+            pass
+
         print("✓ Vehicle closed")
