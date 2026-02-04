@@ -31,26 +31,26 @@ print("Steering test complete!")
 # ------------------------
 # ⚡ 모터 테스트 (전진 ↔ 정지 ↔ 후진 ↔ 정지)
 # ------------------------
-# print("Motor test...")
+print("Motor test...")
 
-# # 전진
-# car.throttle = -0.4
-# print("Forward...")
-# time.sleep(2)
+# 전진
+car.throttle = -0.4
+print("Forward...")
+time.sleep(2)
 
-# # 정지
-# car.throttle = 0.0
-# print("Stop.")
-# time.sleep(1)
+# 정지
+car.throttle = 0.0
+print("Stop.")
+time.sleep(1)
 
-# # 후진
-# car.throttle = 0.3
-# print("Backward...")
-# time.sleep(2)
+# 후진
+car.throttle = 0.3
+print("Backward...")
+time.sleep(2)
 
-# # 정지
-# car.throttle = 0.0
-# print("Stop.")
+# 정지
+car.throttle = 0.0
+print("Stop.")
 
 print("=== All tests complete ===")
 
