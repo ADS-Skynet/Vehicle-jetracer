@@ -47,7 +47,7 @@ class Vehicle:
         image_height: int = 480,
         keepalive_camera: bool = False,
     ):
-        self.camera = Camera(device_path=device)
+        self.camera = Camera(device_path=device, width=image_width, height=image_height)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
         self.action_sub_url = f"tcp://localhost:{action_sub_port}"
         self.param_sub_url = f"tcp://localhost:{param_sub_port}"
@@ -245,7 +245,7 @@ class Vehicle:
                 # Read frame from camera
                 frame = self.camera.read_image()
                 if frame is None:
-                    print("[vehicle] Warning: Failed to read frame from camera")
+                    # print("[vehicle] Warning: Failed to read frame from camera")
                     continue
 
                 # Resize frame if needed -> It won't need unless camera config is wrong
