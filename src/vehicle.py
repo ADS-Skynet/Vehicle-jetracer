@@ -190,7 +190,7 @@ class Vehicle:
         self.throttle = max(0.0, min(1.0, throttle))
 
     def _set_steering(self, steering: float):
-        self.steering = max(-0.9, min(0.9, steering))
+        self.steering = max(-0.9, min(0.85, steering))
 
 
     def _update_vehicle_state(self):
