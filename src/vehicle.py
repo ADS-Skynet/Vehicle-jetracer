@@ -79,7 +79,6 @@ class Vehicle:
             image_shm_name=image_shm_name,
             detection_shm_name=detection_shm_name,
             control_shm_name=control_shm_name,
-            image_shape=(image_height, image_width, 3),
         )
         print("✓ LKAS initialized")
 
@@ -247,11 +246,6 @@ class Vehicle:
                 if frame is None:
                     # print("[vehicle] Warning: Failed to read frame from camera")
                     continue
-
-                # Resize frame if needed -> It won't need unless camera config is wrong
-                # if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
-                #     print("[vehicle] Resizing frame to match LKAS expected size")
-                #     frame = cv2.resize(frame, (self.image_width, self.image_height))
 
                 # Send frame to LKAS via shared memory
                 timestamp = time.time()
