@@ -190,12 +190,12 @@ class Vehicle:
         self.throttle = max(0.0, min(1.0, throttle))
 
     def _set_steering(self, steering: float):
-        self.steering = max(-1.0, min(1.0, steering))
+        self.steering = max(-0.9, min(0.9, steering))
 
 
     def _update_vehicle_state(self):
         self.car.throttle = -self.throttle
-        self.car.steering = -self.steering * 10  # Invert
+        self.car.steering = -self.steering
 
     def _apply_control_from_lkas(self):
         """
