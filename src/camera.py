@@ -10,12 +10,21 @@ class Camera:
     """
 
     def __init__(self, device_path: str = '/dev/video4', width: int = 640, height: int = 480, rotation: int = 0):
-        self.video_capture = cv2.VideoCapture(device_path, cv2.CAP_V4L2)
+        # Set camera resolution using v4l2-ctl before opening (fixes resolution issues)
         try:
-            os.system(f'v4l2-ctl -d {device_path} --set-ctrl=rotate={rotation}')
+            os.system(f'v4l2-ctl -d {device_path} --set-fmt-video=width={width},height={height},pixelformat=YUYV')
+        except Exception:
+            pass
+
+        # Open camera with V4L2 backend
+        self.video_capture = cv2.VideoCapture(device_path, cv2.CAP_V4L2)
+
+        try:
+            # Try to set rotation if supported
+            if rotation != 0:
+                os.system(f'v4l2-ctl -d {device_path} --set-ctrl=rotate={rotation}')
 
             fourcc_yuyv = cv2.VideoWriter_fourcc(*'YUYV')
-            fourcc_mjpg = cv2.VideoWriter_fourcc(*'MJPG')
             self.video_capture.set(cv2.CAP_PROP_FOURCC, fourcc_yuyv)
 
             print(f"Requesting resolution: {width}x{height}")
@@ -58,8 +67,8 @@ class MonochromeCamera(Camera):
     Camera that requests monochrome color effects via v4l2.
     """
 
-    def __init__(self, device_path: str = '/dev/video3', rotation: int = 0):
-        super().__init__(device_path, rotation)
+    def __init__(self, device_path: str = '/dev/video3', rotation: int = 0, width: int = 640, height: int = 480):
+        super().__init__(device_path, rotation, width, height)
         try:
             os.system(f'v4l2-ctl -d {device_path} --set-ctrl=color_effects=1')
         except Exception:
