@@ -194,6 +194,7 @@ class Vehicle:
 
 
     def _update_vehicle_state(self):
+        # print(f"\r[vehicle] Applying control - Throttle: {self.throttle:.2f}, Steering: {self.steering:.2f}", end="", flush=True)
         self.car.throttle = -self.throttle
         self.car.steering = -self.steering
 
