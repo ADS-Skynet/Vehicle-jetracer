@@ -47,7 +47,7 @@ class Vehicle:
         image_height: int = 480,
         keepalive_camera: bool = False,
     ):
-        self.camera = Camera(device_path=device)
+        self.camera = Camera(device_path=device, width=image_width, height=image_height)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
         self.action_sub_url = f"tcp://localhost:{action_sub_port}"
         self.param_sub_url = f"tcp://localhost:{param_sub_port}"
@@ -79,7 +79,6 @@ class Vehicle:
             image_shm_name=image_shm_name,
             detection_shm_name=detection_shm_name,
             control_shm_name=control_shm_name,
-            image_shape=(image_height, image_width, 3),
         )
         print("✓ LKAS initialized")
 
@@ -191,12 +190,13 @@ class Vehicle:
         self.throttle = max(0.0, min(1.0, throttle))
 
     def _set_steering(self, steering: float):
-        self.steering = max(-1.0, min(1.0, steering))
+        self.steering = max(-0.9, min(0.85, steering))
 
 
     def _update_vehicle_state(self):
+        # print(f"\r[vehicle] Applying control - Throttle: {self.throttle:.2f}, Steering: {self.steering:.2f}", end="", flush=True)
         self.car.throttle = -self.throttle
-        self.car.steering = -self.steering * 10  # Invert
+        self.car.steering = -self.steering
 
     def _apply_control_from_lkas(self):
         """
@@ -245,13 +245,8 @@ class Vehicle:
                 # Read frame from camera
                 frame = self.camera.read_image()
                 if frame is None:
-                    print("[vehicle] Warning: Failed to read frame from camera")
+                    # print("[vehicle] Warning: Failed to read frame from camera")
                     continue
-
-                # Resize frame if needed -> It won't need unless camera config is wrong
-                # if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
-                #     print("[vehicle] Resizing frame to match LKAS expected size")
-                #     frame = cv2.resize(frame, (self.image_width, self.image_height))
 
                 # Send frame to LKAS via shared memory
                 timestamp = time.time()
