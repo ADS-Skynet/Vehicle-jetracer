@@ -18,7 +18,7 @@ dependencies = [
   "numpy>=1.24,<3.0",
   "Jetson.GPIO>=2.1.0",
   "jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer",
-  "skynet-common @ git+https://github.com/ADS-Skynet/Common.git@lane-detection-dl",
+  "skynet-common @ git+https://github.com/ADS-Skynet/Common.git",
 ]
 
 # # Optional dependency groups
