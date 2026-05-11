@@ -16,6 +16,8 @@ def main():
                        help=f"Vehicle state publish rate (default: {Communication.PUBLISH_STATE_HZ} Hz)")
     parser.add_argument('--keepalive', action='store_true', default=False,
                        help="Enable camera be alive even with pausing as sending image to LKAS (default: False)")
+    parser.add_argument('--use-cpp-actuator', action='store_true', default=False,
+                       help="Disable Python actuation (C++ actuator controls hardware)")
     args = parser.parse_args()
 
     # Load skynet-common config for LKAS settings
@@ -49,6 +51,7 @@ def main():
         image_width=cfg.camera.width,
         image_height=cfg.camera.height,
         keepalive_camera=args.keepalive,
+        use_cpp_actuator=args.use_cpp_actuator,
     )
     print(f"Starting vehicle loop. Throttle fixed = {v.throttle}")
     print("Press Ctrl+C to stop")

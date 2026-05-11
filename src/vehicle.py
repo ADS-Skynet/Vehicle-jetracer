@@ -46,6 +46,7 @@ class Vehicle:
         image_width: int = 640,
         image_height: int = 480,
         keepalive_camera: bool = False,
+        use_cpp_actuator: bool = False,
     ):
         self.camera = Camera(device_path=device, width=image_width, height=image_height)
         self.status_pub_url = f"tcp://localhost:{status_pub_port}"
@@ -59,14 +60,19 @@ class Vehicle:
         self.image_width = image_width
         self.image_height = image_height
         self.keepalive_camera = keepalive_camera
+        self.use_cpp_actuator = use_cpp_actuator
         self.status = "READY"
 
-        # Initialize NvidiaRacecar for real hardware actuation
-        print("Initializing NvidiaRacecar for real actuation...")
-        self.car = NvidiaRacecar()
-        self.car.steering = 0.0
-        self.car.throttle = 0.0
-        print("✓ NvidiaRacecar initialized")
+        # Initialize NvidiaRacecar for real hardware actuation (optional)
+        self.car = None
+        if not self.use_cpp_actuator:
+            print("Initializing NvidiaRacecar for real actuation...")
+            self.car = NvidiaRacecar()
+            self.car.steering = 0.0
+            self.car.throttle = 0.0
+            print("✓ NvidiaRacecar initialized")
+        else:
+            print("✓ C++ actuator mode enabled (Python actuation disabled)")
 
         # Initialize LKAS with shared memory
         print(f"Initializing LKAS with shared memory...")
@@ -194,6 +200,8 @@ class Vehicle:
 
 
     def _update_vehicle_state(self):
+        if self.use_cpp_actuator or self.car is None:
+            return
         # print(f"\r[vehicle] Applying control - Throttle: {self.throttle:.2f}, Steering: {self.steering:.2f}", end="", flush=True)
         self.car.throttle = -self.throttle
         self.car.steering = -self.steering
@@ -281,9 +289,10 @@ class Vehicle:
         print("[vehicle] Closing...")
 
         try:
-            self.car.throttle = 0.0
-            self.car.steering = 0.0
-            print("✓ Vehicle stopped (safety)")
+            if self.car is not None:
+                self.car.throttle = 0.0
+                self.car.steering = 0.0
+                print("✓ Vehicle stopped (safety)")
         except Exception:
             pass
 
