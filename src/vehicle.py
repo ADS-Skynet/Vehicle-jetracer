@@ -4,7 +4,6 @@ import json
 import zmq
 import cv2
 from lkas import LKASClient as LKAS
-from jetracer.nvidia_racecar import NvidiaRacecar
 
 # Try to reuse common VehicleStatusPublisher if available
 try:
@@ -19,6 +18,7 @@ except Exception:
 
 # Import camera from local module
 from .camera import Camera
+from .rt_control_shm_writer import RtControlShmWriter
 
 
 class Vehicle:
@@ -62,10 +62,13 @@ class Vehicle:
         self.keepalive_camera = keepalive_camera
         self.use_cpp_actuator = use_cpp_actuator
         self.status = "READY"
+        self.rt_control_writer = None
 
         # Initialize NvidiaRacecar for real hardware actuation (optional)
         self.car = None
         if not self.use_cpp_actuator:
+            from jetracer.nvidia_racecar import NvidiaRacecar
+
             print("Initializing NvidiaRacecar for real actuation...")
             self.car = NvidiaRacecar()
             self.car.steering = 0.0
@@ -73,6 +76,10 @@ class Vehicle:
             print("✓ NvidiaRacecar initialized")
         else:
             print("✓ C++ actuator mode enabled (Python actuation disabled)")
+            self.rt_control_writer = RtControlShmWriter()
+            self.rt_control_writer.open()
+            self.rt_control_writer.write_lkas(0.0, 0.0)
+            print("✓ rt_control_shm LKAS writer initialized")
 
         # Initialize LKAS with shared memory
         print(f"Initializing LKAS with shared memory...")
@@ -132,6 +139,7 @@ class Vehicle:
             self.paused = True
             self.throttle_paused = self.throttle
             self._set_throttle(0.0)
+            self._publish_lkas_raw_control()
             self._update_vehicle_state()
             self.status = "PAUSED"
 
@@ -141,6 +149,7 @@ class Vehicle:
         if self.paused:
             self.paused = False
             self._set_throttle(self.throttle_paused)
+            self._publish_lkas_raw_control()
             self._update_vehicle_state()
 
             print("\n[vehicle] RESUMED - Control enabled")
@@ -148,6 +157,7 @@ class Vehicle:
     def _on_reset(self):
         """Reset vehicle state: set steering to 0 and pause."""
         self._set_steering(0.0)
+        self._publish_lkas_raw_control()
         if not self.paused:
             # self._set_throttle(self.throttle_base)
             self._on_pause()
@@ -166,6 +176,7 @@ class Vehicle:
         """
         if parameter == 'throttle':
             self._set_throttle(value)
+            self._publish_lkas_raw_control()
 
     def _send_state(self, frame_id: int):
         state = {
@@ -206,16 +217,24 @@ class Vehicle:
         self.car.throttle = -self.throttle
         self.car.steering = -self.steering
 
+    def _publish_lkas_raw_control(self):
+        if self.rt_control_writer is None:
+            return
+        self.rt_control_writer.write_lkas(self.throttle, self.steering)
+
     def _apply_control_from_lkas(self):
         """
-        Apply control commands from LKAS (steering only).
+        Apply or publish raw control commands from LKAS.
 
-        LKAS handles lateral control (steering). Longitudinal control (throttle)
-        comes from user via parameter updates.
+        Legacy mode keeps Python hardware actuation behavior. C++ actuator mode
+        publishes LKAS raw throttle/steering into rt_control_shm for DCAS.
         """
         control = self.lkas.get_control(timeout=0.1)
         if control is not None:
             self._set_steering(control.steering)
+            if self.use_cpp_actuator:
+                self._set_throttle(getattr(control, "throttle", self.throttle))
+                self._publish_lkas_raw_control()
 
     def run(self):
         self.running = True
@@ -293,6 +312,14 @@ class Vehicle:
                 self.car.throttle = 0.0
                 self.car.steering = 0.0
                 print("✓ Vehicle stopped (safety)")
+        except Exception:
+            pass
+
+        try:
+            if self.rt_control_writer is not None:
+                self.rt_control_writer.write_lkas(0.0, 0.0)
+                self.rt_control_writer.close()
+                print("✓ rt_control_shm LKAS writer closed")
         except Exception:
             pass
 

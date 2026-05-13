@@ -33,6 +33,7 @@ def main():
     print(f"  Image size: {cfg.camera.width}x{cfg.camera.height}")
     print(f"  Throttle Base: {cfg.throttle_policy.base}")
     print(f"  State publish rate: {args.publish_state_hz} Hz")
+    print(f"  Actuator mode: {'C++ rt-actuator' if args.use_cpp_actuator else 'Python legacy'}")
     print("=" * 60)
     print("Note: LKAS broker handles frame/detection broadcasting to viewers")
     print("      Send 'stop' or 'resume' actions from viewer to control vehicle")
