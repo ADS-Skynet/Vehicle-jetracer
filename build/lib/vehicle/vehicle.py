@@ -3,16 +3,12 @@ import time
 import json
 import zmq
 import cv2
-from lkas import LKASClient as LKAS
+from lkas import LKAS
 from jetracer.nvidia_racecar import NvidiaRacecar
 
 # Try to reuse common VehicleStatusPublisher if available
 try:
-    from common.communication.zmq_broadcast import (
-        VehicleStatusPublisher,
-        ActionSubscriber,
-        ParameterSubscriber
-    )
+    from skynet_common.communication.zmq_broadcast import VehicleStatusPublisher, ActionSubscriber
     _HAS_COMMON_PUB = True
 except Exception:
     _HAS_COMMON_PUB = False
@@ -34,37 +30,29 @@ class Vehicle:
     def __init__(
         self,
         device: str = '/dev/video4',
-        status_pub_port: int = 5562,
-        action_sub_port: int = 5561,
-        param_sub_port: int = 5560,
+        broker_status_url: str = 'tcp://localhost:5562',
+        action_url: str = 'tcp://localhost:5561',
         jpeg_quality: int = 80,
         publish_state_hz: int = 10,
-        throttle_base: float = 0.15,
+        throttle: float = 0.25,
+        throttle_prev: float = 0.0,
         image_shm_name: str = "camera_feed",
         detection_shm_name: str = "detection_results",
         control_shm_name: str = "control_commands",
         image_width: int = 640,
         image_height: int = 480,
-        keepalive_camera: bool = False,
     ):
-        self.camera = Camera(device_path=device, width=image_width, height=image_height, enable_depth=True)
-        self.status_pub_url = f"tcp://localhost:{status_pub_port}"
-        self.action_sub_url = f"tcp://localhost:{action_sub_port}"
-        self.param_sub_url = f"tcp://localhost:{param_sub_port}"
+        self.camera = Camera(device_path=device)
         self.steering = 0.0
-        self.throttle = float(throttle_base)
-        self.throttle_paused = float(throttle_base)
-        self.throttle_base = float(throttle_base)
+        self.throttle = float(throttle)
         self.brake = 0.0
         self.image_width = image_width
         self.image_height = image_height
-        self.keepalive_camera = keepalive_camera
         self.status = "READY"
 
         # Initialize NvidiaRacecar for real hardware actuation
         print("Initializing NvidiaRacecar for real actuation...")
         self.car = NvidiaRacecar()
-        self.car.steering_offset = 0.10  # to make the vehicle turn more to the right
         self.car.steering = 0.0
         self.car.throttle = 0.0
         print("✓ NvidiaRacecar initialized")
@@ -80,6 +68,7 @@ class Vehicle:
             image_shm_name=image_shm_name,
             detection_shm_name=detection_shm_name,
             control_shm_name=control_shm_name,
+            image_shape=(image_height, image_width, 3),
         )
         print("✓ LKAS initialized")
 
@@ -87,80 +76,49 @@ class Vehicle:
 
         # Vehicle status publisher (CONNECT to LKAS broker, no BIND)
         if _HAS_COMMON_PUB:
-            self.state_pub = VehicleStatusPublisher(lkas_broker_url=self.status_pub_url)
+            self.state_pub = VehicleStatusPublisher(lkas_broker_url=broker_status_url)
         else:
             self.state_pub = self.context.socket(zmq.PUB)
-            self.state_pub.connect(self.status_pub_url)
+            self.state_pub.connect(broker_status_url)
             self.state_pub.setsockopt(zmq.SNDHWM, 5)
-        print(f"✓ Vehicle status publisher connected to {self.status_pub_url}")
+        print(f"✓ Vehicle status publisher connected to {broker_status_url}")
 
         self.jpeg_quality = int(jpeg_quality)
         self.running = False
         self.publish_state_hz = float(publish_state_hz)
-        self.paused = False if not self.keepalive_camera else True  # Stop/resume state
+        self.paused = False  # Stop/resume state
 
         # Action subscriber (receive commands from viewer via LKAS broker)
         if _HAS_COMMON_PUB:
-            self.action_sub = ActionSubscriber(bind_url=self.action_sub_url, connect_mode=True)
-            self.action_sub.register_action('stop', self._on_pause)
+            self.action_sub = ActionSubscriber(bind_url=action_url, connect_mode=True)
+            self.action_sub.register_action('stop', self._on_stop)
             self.action_sub.register_action('resume', self._on_resume)
-            self.action_sub.register_action('pause', self._on_pause)  # Alias
-            self.action_sub.register_action('reset', self._on_reset)
-            print(f"✓ Action subscriber connected to {self.action_sub_url}")
+            self.action_sub.register_action('pause', self._on_stop)  # Alias
+            print(f"✓ Action subscriber connected to {action_url}")
         else:
             self.action_sub = None
             print("⚠ ActionSubscriber not available, stop/resume disabled")
 
-        # Parameter subscriber (receive throttle updates from viewer via LKAS broker)
-        if _HAS_COMMON_PUB:
-            self.param_sub = ParameterSubscriber(category='vehicle', broker_url=self.param_sub_url)
-            self.param_sub.register_callback(self._on_parameter_update)
-        else:
-            self.param_sub = None
-            print("⚠ ParameterSubscriber not available, throttle updates disabled")
-
         # Give ZMQ time to establish connection (slow joiner problem)
         time.sleep(0.2)
 
-    def _on_pause(self):
+    def _on_stop(self):
         if not self.paused:
             self.paused = True
-            self.throttle_paused = self.throttle
-            self._set_throttle(0.0)
-            self._apply_vehicle_state()
+            self.throttle_prev = self.throttle
+            self.throttle = 0.0
+            self.car.throttle = 0.0
             self.status = "PAUSED"
 
-            print("\n[vehicle] PAUSED - Control disabled")
+            print("\n[vehicle] STOPPED - Control disabled")
 
     def _on_resume(self):
         if self.paused:
             self.paused = False
-            self._set_throttle(self.throttle_paused)
-            self._apply_vehicle_state()
+            self.throttle = self.throttle_prev
+            self.car.throttle = self.throttle
 
             print("\n[vehicle] RESUMED - Control enabled")
-
-    def _on_reset(self):
-        """Reset vehicle state: set steering to 0 and pause."""
-        self._set_steering(0.0)
-        if not self.paused:
-            # self._set_throttle(self.throttle_base)
-            self._on_pause()
-        # else:
-        #     self.throttle_paused = self.throttle_base
-
-        print("\n[vehicle] RESET - Steering set to 0, vehicle paused")
-
-    def _on_parameter_update(self, parameter: str, value: float):
-        """
-        Handle parameter updates from viewer (via LKAS broker).
-
-        Args:
-            parameter: Parameter name (e.g., 'throttle')
-            value: New parameter value
-        """
-        if parameter == 'throttle':
-            self._set_throttle(value)
 
     def _send_state(self, frame_id: int):
         state = {
@@ -187,34 +145,20 @@ class Vehicle:
         except Exception:
             pass
 
-    def _set_throttle(self, throttle: float):
-        self.throttle = max(-1.0, min(1.0, throttle))
-
-    def _set_steering(self, steering: float):
-        self.steering = max(-0.85, min(0.85, steering))
-
-
-    def _apply_vehicle_state(self):
-        print(f"\r[vehicle] Applying control | Steering: {self.steering:.2f}, Throttle: {self.throttle:.2f}")
-        self.car.throttle = -self.throttle
-        self.car.steering = -self.steering
-
-    def _update_control_from_lkas(self):
-        """
-        Apply control commands from LKAS (steering + throttle).
-
-        LKAS handles lateral control (steering). Throttle comes from the
-        DecisionServer which merges LKAS adaptive throttle with obstacle
-        avoidance overrides (e.g. SLOW action reduces throttle when an
-        obstacle is detected within range).
-        """
+    def _apply_control_from_lkas(self):
         control = self.lkas.get_control(timeout=0.1)
         if control is not None:
-            print(f"\r[vehicle] Received control from LKAS | Steering: {control.steering:.2f}, Throttle: {control.throttle:.2f}")
-            if control.steering > 1.0 or control.steering < -1.0:
-                print("WARRRRRRNNNNNNIIIIIIINNNNNNGGGGG")
-            self._set_steering(control.steering)
-            self._set_throttle(control.throttle)
+            self.steering = max(-1.0, min(1.0, control.steering))
+            self.brake = control.brake
+
+            # Apply to real hardware
+            self.car.steering = -self.steering * 10
+
+            if self.brake > 0.5:
+                self.car.throttle = 0.0
+            else:
+                self.car.throttle = self.throttle
+
 
     def run(self):
         self.running = True
@@ -235,37 +179,33 @@ class Vehicle:
                 if self.action_sub:
                     self.action_sub.poll()
 
-                # Poll for parameter updates (throttle from viewer)
-                if self.param_sub:
-                    self.param_sub.poll()
-
                 now = time.time()
                 if now - last_state_ts >= 1.0 / self.publish_state_hz:
                     self._send_state(frame_id)
                     last_state_ts = now
 
                 # If paused, skip reading/applying control
-                if self.paused and not self.keepalive_camera:
+                if self.paused:
                     time.sleep(0.5)
                     continue
 
-                # Read frame from camera (color + optional depth)
-                timestamp = time.time()
-                frame, depth = self.camera.read_frames(timestamp, frame_id)
+                # Read frame from camera
+                frame = self.camera.read_image()
                 if frame is None:
+                    print("[vehicle] Warning: Failed to read frame from camera")
                     continue
 
-                # Send frame (and depth) to LKAS via shared memory
-                self.lkas.send_image(
-                    frame, timestamp, frame_id,
-                    depth_image=depth,
-                    depth_scale=self.camera.depth_scale,
-                )
+                # Resize frame if needed -> It won't need unless camera config is wrong
+                # if frame.shape[0] != self.image_height or frame.shape[1] != self.image_width:
+                #     print("[vehicle] Resizing frame to match LKAS expected size")
+                #     frame = cv2.resize(frame, (self.image_width, self.image_height))
 
-                # If keepalive is enabled, the loop may be fallout to here, so we should check pause state again at here
-                if not self.paused :
-                    self._update_control_from_lkas()
-                    self._apply_vehicle_state()
+                # Send frame to LKAS via shared memory
+                timestamp = time.time()
+                self.lkas.send_image(frame, timestamp, frame_id)
+
+                # Apply control commands from LKAS
+                self._apply_control_from_lkas()
 
                 # FPS calculation and status update
                 fps_frame_count += 1
@@ -307,13 +247,6 @@ class Vehicle:
             if self.action_sub:
                 self.action_sub.close()
                 print("✓ Action subscriber closed")
-        except Exception:
-            pass
-
-        try:
-            if self.param_sub:
-                self.param_sub.close()
-                print("✓ Parameter subscriber closed")
         except Exception:
             pass
 

@@ -9,8 +9,8 @@ This module provides the Vehicle class that integrates:
 """
 
 from .vehicle import Vehicle
-from .camera import Camera
+from .camera import Camera, MonochromeCamera
 from .main import main
 
 __version__ = "0.1.0"
-__all__ = ["Vehicle", "Camera", "main"]
+__all__ = ["Vehicle", "Camera", "MonochromeCamera", "main"]

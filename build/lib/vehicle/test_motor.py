@@ -3,7 +3,6 @@ import time
 
 # JetRacer 객체 생성
 car = NvidiaRacecar()
-car.steering_offset = 0.1  # to make the vehicle turn more to the right
 
 print("=== JetRacer Servo & Motor Combined Test ===")
 
@@ -29,9 +28,9 @@ time.sleep(1)
 
 print("Steering test complete!")
 
-# # ------------------------
-# # ⚡ 모터 테스트 (전진 ↔ 정지 ↔ 후진 ↔ 정지)
-# # ------------------------
+# ------------------------
+# ⚡ 모터 테스트 (전진 ↔ 정지 ↔ 후진 ↔ 정지)
+# ------------------------
 # print("Motor test...")
 
 # # 전진
@@ -53,5 +52,5 @@ print("Steering test complete!")
 # car.throttle = 0.0
 # print("Stop.")
 
-# print("=== All tests complete ===")
+print("=== All tests complete ===")
 

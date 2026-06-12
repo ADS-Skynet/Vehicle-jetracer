@@ -1,0 +1,13 @@
+Metadata-Version: 2.4
+Name: skynet-vehicle
+Version: 0.1.0
+Summary: Vehicle loop for jetracer with LKAS integration
+Author-email: Siwoo248 <siwoo0408@kookmin.ac.kr>
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: opencv-python<5.0,>=4.8
+Requires-Dist: pyyaml<7.0,>=6.0
+Requires-Dist: pyzmq<28.0,>=25.0
+Requires-Dist: numpy<3.0,>=1.24
+Requires-Dist: jetracer @ git+https://github.com/waveshare/Jetracer.git@master#egg=jetracer
+Requires-Dist: skynet-common @ git+https://github.com/ADS-Skynet/Common.git@lane-detection-dl
