@@ -9,9 +9,9 @@ class RtControlShmWriter:
 
     SHM_PATH = "/dev/shm/rt_control_shm"
     MAGIC = 0x5243544C
-    VERSION = 1
+    VERSION = 2
     RING_CAPACITY = 64
-    LAYOUT_SIZE = 4648
+    LAYOUT_SIZE = 4680
     LKAS_RING_OFFSET = 1560
     RING_ENTRIES_OFFSET = 8
     SAMPLE_SIZE = 24
